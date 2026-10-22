@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import TarjetaKPI from "../components/TarjetaKPI";
 import GraficoMovimientos from "../components/GraficoMovimientos";
-
+import ResumenIA from "../components/ResumenIA";
+import { useTiempoReal } from "../hooks/useTiempoReal";
 export default function Dashboard() {
   const [resumen, setResumen] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-
   useEffect(() => {
     api
       .get("/dashboard/resumen")
@@ -19,6 +19,10 @@ export default function Dashboard() {
       )
       .finally(() => setCargando(false));
   }, []);
+    // Tiempo real: KPIs, gráfico y alertas se refrescan solos cuando cambia el inventario
+  useTiempoReal(["variantes", "movimientos"], () => {
+    api.get("/dashboard/resumen").then(setResumen).catch(() => {});
+  });
 
   if (cargando) return <p style={{ padding: "2rem" }}>Cargando dashboard...</p>;
   if (error) return <p style={{ padding: "2rem", color: "#c0392b" }}>{error}</p>;
@@ -29,7 +33,7 @@ export default function Dashboard() {
   return (
     <div className="dashboard">
       <h1>Panel administrativo</h1>
-
+         <ResumenIA />
       <div className="kpi-grid">
         <TarjetaKPI titulo="Productos activos" valor={totales.productos} />
         <TarjetaKPI titulo="Stock normal" valor={totales.stockNormal} tono="normal" />

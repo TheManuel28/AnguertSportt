@@ -48,6 +48,19 @@ router.post(
     }
   }
 );
+// El cliente autenticado ve sus propios pedidos
+router.get("/mis-pedidos", verificarToken, async (req, res, next) => {
+  try {
+    const cliente = await clienteService.obtenerPorUid(req.usuario.uid);
+    if (!cliente) {
+      return res.json([]);
+    }
+    const pedidos = await pedidoService.listarPorCliente(cliente.id);
+    res.json(pedidos);
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.patch(
   "/:id/estado",

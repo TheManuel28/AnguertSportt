@@ -27,4 +27,19 @@ export const movimientoRepository = {
       .get();
     return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   },
+
+  /**
+   * Trae movimientos dentro de un rango de fechas (ambos límites
+   * opcionales), sin límite de cantidad — usado por los reportes
+   * exportables, a diferencia de listar() que sí limita a 50 para la
+   * pantalla de historial del día a día.
+   */
+  async listarPorRango({ desde, hasta } = {}) {
+    let query = coleccion;
+    if (desde) query = query.where("fecha", ">=", desde);
+    if (hasta) query = query.where("fecha", "<=", hasta);
+    query = query.orderBy("fecha", "desc");
+    const snapshot = await query.get();
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  },
 };

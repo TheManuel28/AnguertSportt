@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-
+import { useTiempoReal } from "../hooks/useTiempoReal";
 const MOTIVOS_POR_TIPO = {
   ENTRADA: ["PRODUCCION", "COMPRA", "DEVOLUCION_CLIENTE", "AJUSTE_POSITIVO"],
   SALIDA: ["VENTA", "PEDIDO_MAYORISTA", "MERMA", "MUESTRA", "AJUSTE_NEGATIVO"],
@@ -47,15 +47,17 @@ export default function AdminInventario() {
     setHistorial(data);
   }
 
-  async function cargarTodo() {
-    setCargando(true);
-    setError("");
+    async function cargarTodo({ silencioso = false } = {}) {
+    if (!silencioso) {
+      setCargando(true);
+      setError("");
+    }
     try {
       await Promise.all([cargarVariantes(), cargarHistorial()]);
     } catch (err) {
-      setError(err.message || "No se pudo cargar el inventario");
+      if (!silencioso) setError(err.message || "No se pudo cargar el inventario");
     } finally {
-      setCargando(false);
+      if (!silencioso) setCargando(false);
     }
   }
 
@@ -63,6 +65,9 @@ export default function AdminInventario() {
     cargarTodo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Tiempo real: si alguien registra un movimiento o se vende algo, el stock y el historial se actualizan solos
+  useTiempoReal(["variantes", "movimientos"], () => cargarTodo({ silencioso: true }));
 
   const varianteSeleccionada = variantes.find((v) => v.id === varianteId);
 

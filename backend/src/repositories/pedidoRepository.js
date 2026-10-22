@@ -15,19 +15,19 @@ export const pedidoRepository = {
   },
 
   async listarPorCliente(clienteId) {
-    const snapshot = await coleccion
-      .where("clienteId", "==", clienteId)
-      .orderBy("fechaCreacion", "desc")
-      .get();
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  },
+  const snapshot = await coleccion.where("clienteId", "==", clienteId).get();
+  const pedidos = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  return pedidos.sort((a, b) => {
+    const fa = a.fechaCreacion?._seconds ?? 0;
+    const fb = b.fechaCreacion?._seconds ?? 0;
+    return fb - fa;
+  });
+},
 
  async listarPorEstado(estado) {
-  const snapshot = await coleccion
-    .where("estado", "==", estado)
-    .orderBy("fechaCreacion", "desc")
-    .get();
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const snapshot = await coleccion.where("estado", "==", estado).get();
+  const pedidos = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  return pedidos.sort((a, b) => (b.fechaCreacion?._seconds ?? 0) - (a.fechaCreacion?._seconds ?? 0));
 },
 
 async listarTodos() {

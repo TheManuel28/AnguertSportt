@@ -4,6 +4,8 @@ import { auth } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useCart } from "../context/CartContext";
+import { useTiempoReal } from "../hooks/useTiempoReal";
+import IndicadorEnVivo from "./IndicadorEnVivo";
 
 export default function Navbar() {
   const { usuario, rol } = useAuth();
@@ -58,13 +60,17 @@ export default function Navbar() {
             Mis pedidos
           </Link>
         )}
-
+         <Link to="/admin/reportes" className={claseEnlace("/admin/reportes")}>
+          Reportes
+         </Link>
         {!esAdmin && (
           <Link to="/carrito" className={`navbar-carrito ${claseEnlace("/carrito")}`}>
             🛒 Carrito
             {totalItems > 0 && <span className="navbar-carrito-badge">{totalItems}</span>}
           </Link>
         )}
+        
+        {usuario && esAdmin && <IndicadorEnVivo />}
 
         <button
           type="button"

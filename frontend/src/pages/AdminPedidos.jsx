@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-
+import { useTiempoReal } from "../hooks/useTiempoReal";
 const ESTADOS = [
   "PENDIENTE_PAGO_INICIAL",
   "CONFIRMADO",
@@ -26,23 +26,33 @@ export default function AdminPedidos() {
   const [mensaje, setMensaje] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
 
-  async function cargarPedidos(estado) {
-    setCargando(true);
-    setError("");
+    async function cargarPedidos(estado, { silencioso = false } = {}) {
+    if (!silencioso) {
+      setCargando(true);
+      setError("");
+    }
     try {
       const query = estado ? `?estado=${estado}` : "";
       const data = await api.get(`/pedidos${query}`);
       setPedidos(data);
     } catch (err) {
-      setError(err.message);
+      if (!silencioso) setError(err.message);
     } finally {
-      setCargando(false);
+      if (!silencioso) setCargando(false);
     }
   }
 
   useEffect(() => {
     cargarPedidos("");
   }, []);
+
+  // Tiempo real: cuando llega o cambia un pedido, la lista se recarga sola (sin parpadeo)
+  useTiempoReal(["pedidos"], ({ agregados }) => {
+    cargarPedidos(filtroEstado, { silencioso: true });
+    if (agregados > 0) {
+      mostrarMensaje(agregados === 1 ? "Llegó un pedido nuevo" : `Llegaron ${agregados} pedidos nuevos`);
+    }
+  });
 
   function mostrarMensaje(texto) {
     setMensaje(texto);

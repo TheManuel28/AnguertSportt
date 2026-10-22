@@ -1,6 +1,7 @@
 import { pedidoRepository } from "../repositories/pedidoRepository.js";
 import { varianteRepository } from "../repositories/varianteRepository.js";
 import { inventarioService } from "./inventarioService.js";
+import { productoRepository } from "../repositories/productoRepository.js";
 
 const ESTADOS_PEDIDO = [
   "PENDIENTE_PAGO_INICIAL",
@@ -29,31 +30,40 @@ export const pedidoService = {
     const detalle = [];
 
     for (const item of items) {
-      const variante = await varianteRepository.obtenerPorId(item.varianteId);
-      if (!variante) {
-        const error = new Error(`La variante ${item.varianteId} no existe`);
-        error.status = 404;
-        throw error;
-      }
-      if (variante.stockActual < item.cantidad) {
-        const error = new Error(
-          `Stock insuficiente para ${variante.productoNombre} (${variante.talla}/${variante.color})`
-        );
-        error.status = 400;
-        throw error;
-      }
-      const subtotal = variante.precioVenta * item.cantidad;
-      total += subtotal;
-      detalle.push({
-        varianteId: variante.id,
-        productoNombre: variante.productoNombre,
-        talla: variante.talla,
-        color: variante.color,
-        cantidad: item.cantidad,
-        precioUnitario: variante.precioVenta,
-        subtotal,
-      });
-    }
+  const variante = await varianteRepository.obtenerPorId(item.varianteId);
+  if (!variante) {
+    const error = new Error(`La variante ${item.varianteId} no existe`);
+    error.status = 404;
+    throw error;
+  }
+  if (variante.stockActual < item.cantidad) {
+    const error = new Error(
+      `Stock insuficiente para ${variante.productoNombre} (${variante.talla}/${variante.color})`
+    );
+    error.status = 400;
+    throw error;
+  }
+
+  const producto = await productoRepository.obtenerPorId(variante.productoId);
+  if (!producto) {
+    const error = new Error(`El producto de la variante ${item.varianteId} no existe`);
+    error.status = 404;
+    throw error;
+  }
+
+  const precioUnitario = producto.precioVenta;
+  const subtotal = precioUnitario * item.cantidad;
+  total += subtotal;
+  detalle.push({
+    varianteId: variante.id,
+    productoNombre: variante.productoNombre,
+    talla: variante.talla,
+    color: variante.color,
+    cantidad: item.cantidad,
+    precioUnitario,
+    subtotal,
+  });
+}
 
     const pagoInicial = Math.round(total * 0.5 * 100) / 100;
     const pagoRestante = total - pagoInicial;

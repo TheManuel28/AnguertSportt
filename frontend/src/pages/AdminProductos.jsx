@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-
+import { useTiempoReal } from "../hooks/useTiempoReal";
 const ESTADO_INICIAL_PRODUCTO = {
   codigo: "",
   nombre: "",
@@ -21,6 +21,7 @@ const ESTADO_INICIAL_VARIANTE = {
 export default function AdminProductos() {
   const [categorias, setCategorias] = useState([]);
   const [productos, setProductos] = useState([]);
+  const [imagenesDisponibles, setImagenesDisponibles] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
@@ -38,9 +39,14 @@ export default function AdminProductos() {
     setCargando(true);
     setError("");
     try {
-      const [cats, prods] = await Promise.all([api.get("/categorias"), api.get("/productos")]);
+      const [cats, prods, imagenes] = await Promise.all([
+        api.get("/categorias"),
+        api.get("/productos"),
+        api.get("/productos/imagenes-disponibles"),
+      ]);
       setCategorias(cats);
       setProductos(prods);
+      setImagenesDisponibles(imagenes);
     } catch (err) {
       setError(err.message || "No se pudo cargar la información");
     } finally {
@@ -51,6 +57,10 @@ export default function AdminProductos() {
   useEffect(() => {
     cargarDatos();
   }, []);
+    // Tiempo real: el stock total de cada producto se actualiza solo
+  useTiempoReal(["productos", "variantes"], () => {
+    api.get("/productos").then(setProductos).catch(() => {});
+  });
 
   function mostrarMensaje(texto) {
     setMensaje(texto);
@@ -145,27 +155,27 @@ export default function AdminProductos() {
   }
 
   async function eliminarVariante(productoId, varianteId) {
-  if (!window.confirm("¿Eliminar esta variante?")) return;
-  setError("");
-  const variante = detalleProducto?.variantes?.find((v) => v.id === varianteId);
-  try {
-    await api.del(`/productos/${productoId}/variantes/${varianteId}`);
-    setDetalleProducto((prev) => ({
-      ...prev,
-      variantes: prev.variantes.filter((v) => v.id !== varianteId),
-    }));
-    setProductos((prev) =>
-      prev.map((p) =>
-        p.id === productoId
-          ? { ...p, stockTotal: Math.max(0, (p.stockTotal || 0) - (variante?.stockActual || 0)) }
-          : p
-      )
-    );
-    mostrarMensaje("Variante eliminada");
-  } catch (err) {
-    setError(err.message);
+    if (!window.confirm("¿Eliminar esta variante?")) return;
+    setError("");
+    const variante = detalleProducto?.variantes?.find((v) => v.id === varianteId);
+    try {
+      await api.del(`/productos/${productoId}/variantes/${varianteId}`);
+      setDetalleProducto((prev) => ({
+        ...prev,
+        variantes: prev.variantes.filter((v) => v.id !== varianteId),
+      }));
+      setProductos((prev) =>
+        prev.map((p) =>
+          p.id === productoId
+            ? { ...p, stockTotal: Math.max(0, (p.stockTotal || 0) - (variante?.stockActual || 0)) }
+            : p
+        )
+      );
+      mostrarMensaje("Variante eliminada");
+    } catch (err) {
+      setError(err.message);
+    }
   }
-}
 
   async function guardarImagen(e, productoId) {
     e.preventDefault();
@@ -271,16 +281,38 @@ export default function AdminProductos() {
 
           <label className="col-completa">
             Imagen referencial (opcional)
-            <input
-              value={formProducto.imagenUrl}
-              onChange={(e) => setFormProducto({ ...formProducto, imagenUrl: e.target.value })}
-              placeholder="/productos/real-madrid-local.png  o  https://..."
-            />
+            <div className="selector-imagen">
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setFormProducto((prev) => ({ ...prev, imagenUrl: e.target.value }));
+                  }
+                }}
+              >
+                <option value="">
+                  {imagenesDisponibles.length === 0
+                    ? "No hay imágenes en frontend/public/productos/"
+                    : "Elegir de la carpeta productos/"}
+                </option>
+                {imagenesDisponibles.map((img) => (
+                  <option key={img.ruta} value={img.ruta}>
+                    {img.nombre}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={formProducto.imagenUrl}
+                onChange={(e) => setFormProducto({ ...formProducto, imagenUrl: e.target.value })}
+                placeholder="o pega una URL externa"
+              />
+            </div>
+            {formProducto.imagenUrl && (
+              <img src={formProducto.imagenUrl} alt="Vista previa" className="vista-previa-imagen" />
+            )}
             <span className="texto-ayuda">
-              Puedes pegar una URL de imagen, o crear la carpeta{" "}
-              <code>frontend/public/productos/</code>, poner ahí tu .png y escribir la ruta como{" "}
-              <code>/productos/nombre-archivo.png</code>. Si lo dejas vacío, se muestra un
-              marcador de posición.
+              El desplegable lista lo que ya subiste a <code>frontend/public/productos/</code>.
+              Si aún no tienes el archivo ahí, puedes dejarlo vacío o pegar una URL.
             </span>
           </label>
 
@@ -338,13 +370,33 @@ export default function AdminProductos() {
                     className="formulario-imagen"
                     onSubmit={(e) => guardarImagen(e, producto.id)}
                   >
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) setImagenEditando(e.target.value);
+                      }}
+                    >
+                      <option value="">
+                        {imagenesDisponibles.length === 0
+                          ? "No hay imágenes en productos/"
+                          : "Elegir de la carpeta productos/"}
+                      </option>
+                      {imagenesDisponibles.map((img) => (
+                        <option key={img.ruta} value={img.ruta}>
+                          {img.nombre}
+                        </option>
+                      ))}
+                    </select>
                     <input
                       value={imagenEditando}
                       onChange={(e) => setImagenEditando(e.target.value)}
-                      placeholder="/productos/nombre-archivo.png  o  https://..."
+                      placeholder="o pega una URL externa"
                     />
                     <button type="submit">Guardar imagen</button>
                   </form>
+                  {imagenEditando && (
+                    <img src={imagenEditando} alt="Vista previa" className="vista-previa-imagen" />
+                  )}
 
                   <h3>Variantes (talla / color)</h3>
                   {detalleProducto.variantes?.length === 0 && (
@@ -352,19 +404,22 @@ export default function AdminProductos() {
                   )}
                   <ul className="lista-variantes">
                     {detalleProducto.variantes?.map((v) => (
-                     <li key={v.id} className={`variante-${v.estadoStock?.toLowerCase()}`}>
-                    <span>{v.talla} / {v.color}</span>
-                    <span>SKU: {v.codigoSku}</span>
-                    <span>Stock: {v.stockActual}</span>
-                    <span className="etiqueta-estado">{v.estadoStock}</span>
-                    <button
-                         type="button"
-                         className="boton-eliminar-variante"
-                         onClick={() => eliminarVariante(producto.id, v.id)}
-                    >
+                      <li key={v.id} className={`variante-${v.estadoStock?.toLowerCase()}`}>
+                        <span>
+                          {v.talla} / {v.color}
+                        </span>
+                        <span>SKU: {v.codigoSku}</span>
+                        <span>Stock: {v.stockActual}</span>
+                        <span className="etiqueta-estado">{v.estadoStock}</span>
+                        <button
+                          type="button"
+                          className="boton-eliminar-variante"
+                          onClick={() => eliminarVariante(producto.id, v.id)}
+                          title="Eliminar variante"
+                        >
                           🗑
-                       </button>
-                  </li>
+                        </button>
+                      </li>
                     ))}
                   </ul>
 

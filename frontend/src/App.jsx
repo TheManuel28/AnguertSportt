@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { CartProvider } from "./context/CartContext";
 import Layout from "./components/Layout";
-
+import AdminReportes from "./pages/AdminReportes";
 import Login from "./pages/Login";
 import Registro from "./pages/Registro";
 import Catalogo from "./pages/Catalogo";
@@ -83,6 +83,14 @@ function AppRoutes() {
             </RutaAdmin>
           }
         />
+        <Route
+         path="/admin/reportes"
+          element={
+          <RutaAdmin>
+          <AdminReportes />
+    </RutaAdmin>
+  }
+/>
       </Routes>
     </Layout>
   );

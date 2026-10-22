@@ -1,6 +1,5 @@
 import { auth } from "../firebase";
-
-const BASE_URL = "/api";
+import { API_BASE as BASE_URL } from "./config";
 
 async function request(path, options = {}) {
   const usuario = auth.currentUser;
