@@ -52,6 +52,9 @@ export default function Navbar() {
             <Link to="/admin/pedidos" className={claseEnlace("/admin/pedidos")}>
               Pedidos
             </Link>
+            <Link to="/admin/reportes" className={claseEnlace("/admin/reportes")}>
+          Reportes
+         </Link>
           </>
         )}
 
@@ -60,9 +63,6 @@ export default function Navbar() {
             Mis pedidos
           </Link>
         )}
-         <Link to="/admin/reportes" className={claseEnlace("/admin/reportes")}>
-          Reportes
-         </Link>
         {!esAdmin && (
           <Link to="/carrito" className={`navbar-carrito ${claseEnlace("/carrito")}`}>
             🛒 Carrito

@@ -1060,3 +1060,52 @@ input, select, textarea {
   70% { box-shadow: 0 0 0 7px rgba(76, 197, 130, 0); }
   100% { box-shadow: 0 0 0 0 rgba(76, 197, 130, 0); }
 }
+/* ---------- Pago con Yape (manual) ---------- */
+.confirmacion-pedido { max-width: 560px; }
+.pago-yape {
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(116, 34, 132, 0.45);
+  background: rgba(116, 34, 132, 0.1);
+  text-align: left;
+}
+.pago-yape h3 { margin: 0 0 0.6rem; font-size: 1rem; }
+.pago-yape-pasos { margin: 0 0 0.9rem; padding-left: 1.2rem; display: grid; gap: 0.6rem; font-size: 0.92rem; line-height: 1.45; }
+.pago-yape-datos { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.35rem; }
+.pago-yape-numero { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.04em; color: #c78bd6; }
+.pago-yape-qr { display: block; width: 170px; max-width: 100%; margin-top: 0.6rem; border-radius: 8px; background: #fff; padding: 6px; }
+.pago-yape-form { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.pago-yape-form input { flex: 1 1 220px; min-width: 0; padding: 0.55rem 0.7rem; border-radius: 6px; border: 1px solid var(--color-borde, #2b3142); background: transparent; color: inherit; font-size: 0.95rem; }
+.pago-yape-revision { border-color: rgba(245, 180, 0, 0.45); background: rgba(245, 180, 0, 0.08); }
+.pago-yape-revision p { margin: 0.3rem 0 0; font-size: 0.9rem; }
+
+.pago-yape-revisar {
+  margin: 0.8rem 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid rgba(116, 34, 132, 0.5);
+  background: rgba(116, 34, 132, 0.12);
+  display: grid;
+  gap: 0.2rem;
+}
+.aviso-yape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(116, 34, 132, 0.55);
+  background: rgba(116, 34, 132, 0.16);
+  font-weight: 600;
+}
+.rechazo-pago { margin-top: 0.8rem; display: grid; gap: 0.5rem; }
+.rechazo-pago input { padding: 0.5rem 0.7rem; border-radius: 6px; border: 1px solid var(--color-borde, #2b3142); background: transparent; color: inherit; }
+.rechazo-pago-motivos { display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.85rem; }
+.estado-pago_en_revision { background: rgba(116, 34, 132, 0.22); color: #d9a6e4; }
+.mis-pedidos-cabecera { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.boton-secundario { background: transparent; color: inherit; border: 1px solid var(--color-borde, #2b3142); border-radius: 4px; padding: 0.6rem 0.9rem; cursor: pointer; font-weight: 600; }
+.boton-secundario:hover:not(:disabled) { border-color: #e35d55; color: #e35d55; }
+.boton-secundario:disabled, .boton-primario:disabled { opacity: 0.55; cursor: default; }

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
+import PagoYape from "../components/PagoYape";
 
 export default function Carrito() {
   const { items, actualizarCantidad, quitarItem, vaciarCarrito, totalPrecio } = useCart();
@@ -45,10 +46,7 @@ export default function Carrito() {
             </li>
             <li>Pago restante al recibir: S/ {pedidoConfirmado.pagoRestante.toFixed(2)}</li>
           </ul>
-          <p className="texto-ayuda">
-            Coordina el pago inicial con la tienda para que confirmen tu pedido y empiece a
-            prepararse.
-          </p>
+          <PagoYape pedido={pedidoConfirmado} onActualizado={setPedidoConfirmado} />
           <div className="acciones-confirmacion">
             <Link to="/mis-pedidos" className="boton-primario">
               Ver mis pedidos
