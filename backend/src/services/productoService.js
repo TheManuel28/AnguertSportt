@@ -1,3 +1,4 @@
+import { db } from "../config/firebase.js";
 import { productoRepository } from "../repositories/productoRepository.js";
 import { varianteRepository } from "../repositories/varianteRepository.js";
 
@@ -21,35 +22,49 @@ export const productoService = {
   },
 
   async agregarVariante(productoId, datos) {
-    const producto = await productoRepository.obtenerPorId(productoId);
-    if (!producto) {
-      const error = new Error("Producto no encontrado");
-      error.status = 404;
-      throw error;
-    }
-
     const stockInicial = datos.stockInicial ?? 0;
     const stockMinimo = datos.stockMinimo ?? 5;
+    const varianteRef = db.collection("variantes").doc();
+    const productoRef = productoRepository.referencia(productoId);
 
-    const variante = {
-      productoId,
-      productoNombre: producto.nombre,
-      codigoSku: datos.codigoSku,
-      talla: datos.talla,
-      color: datos.color,
-      stockActual: stockInicial,
-      stockMinimo,
-      estadoStock: stockInicial <= 0 ? "AGOTADO" : stockInicial <= stockMinimo ? "BAJO" : "NORMAL",
-      activo: true,
-      fechaActualizacion: new Date(),
-    };
-    const varianteCreada = await varianteRepository.crear(variante);
+    return db.runTransaction(async (tx) => {
+      const productoSnap = await tx.get(productoRef);
+      if (!productoSnap.exists) {
+        const error = new Error("Producto no encontrado");
+        error.status = 404;
+        throw error;
+      }
 
-    await productoRepository.actualizar(productoId, {
-      stockTotal: (producto.stockTotal ?? 0) + stockInicial,
+      const variantesSnap = await tx.get(
+        db.collection("variantes").where("productoId", "==", productoId)
+      );
+      const stockExistente = variantesSnap.docs.reduce((total, doc) => {
+        const variante = doc.data();
+        const stock = Number(variante.stockActual ?? 0);
+        return variante.activo === true && Number.isFinite(stock) ? total + stock : total;
+      }, 0);
+      const producto = productoSnap.data();
+      const variante = {
+        productoId,
+        productoNombre: producto.nombre,
+        codigoSku: datos.codigoSku,
+        talla: datos.talla,
+        color: datos.color,
+        stockActual: stockInicial,
+        stockMinimo,
+        estadoStock: stockInicial <= 0 ? "AGOTADO" : stockInicial <= stockMinimo ? "BAJO" : "NORMAL",
+        activo: true,
+        fechaActualizacion: new Date(),
+      };
+
+      tx.create(varianteRef, variante);
+      tx.update(productoRef, {
+        stockTotal: stockExistente + stockInicial,
+        fechaActualizacion: new Date(),
+      });
+
+      return { id: varianteRef.id, ...variante };
     });
-
-    return varianteCreada;
   },
 
   async listarCatalogo(filtros) {
@@ -73,23 +88,38 @@ export const productoService = {
   return productoRepository.actualizar(productoId, { imagenUrl: imagenUrl || "" });
 },
 async eliminarVariante(productoId, varianteId) {
-  const producto = await productoRepository.obtenerPorId(productoId);
-  if (!producto) {
-    const error = new Error("Producto no encontrado");
-    error.status = 404;
-    throw error;
-  }
-  const variante = await varianteRepository.obtenerPorId(varianteId);
-  if (!variante || variante.productoId !== productoId) {
-    const error = new Error("Variante no encontrada");
-    error.status = 404;
-    throw error;
-  }
+  const productoRef = productoRepository.referencia(productoId);
+  const varianteRef = varianteRepository.referencia(varianteId);
 
-  await varianteRepository.desactivar(varianteId);
+  await db.runTransaction(async (tx) => {
+    const productoSnap = await tx.get(productoRef);
+    const varianteSnap = await tx.get(varianteRef);
+    if (!productoSnap.exists) {
+      const error = new Error("Producto no encontrado");
+      error.status = 404;
+      throw error;
+    }
+    if (!varianteSnap.exists || varianteSnap.data().productoId !== productoId) {
+      const error = new Error("Variante no encontrada");
+      error.status = 404;
+      throw error;
+    }
 
-  await productoRepository.actualizar(productoId, {
-    stockTotal: Math.max(0, (producto.stockTotal ?? 0) - (variante.stockActual ?? 0)),
+    const variantesSnap = await tx.get(
+      db.collection("variantes").where("productoId", "==", productoId)
+    );
+    const stockTotalCalculado = variantesSnap.docs.reduce((total, doc) => {
+      const variante = doc.data();
+      if (doc.id === varianteId || variante.activo !== true) return total;
+      const stock = Number(variante.stockActual ?? 0);
+      return Number.isFinite(stock) ? total + stock : total;
+    }, 0);
+
+    tx.update(varianteRef, { activo: false, fechaActualizacion: new Date() });
+    tx.update(productoRef, {
+      stockTotal: stockTotalCalculado,
+      fechaActualizacion: new Date(),
+    });
   });
 },
 };

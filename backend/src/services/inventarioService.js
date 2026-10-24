@@ -17,9 +17,12 @@ export const inventarioService = {
    * atómica: crea el movimiento, actualiza el stock de la variante y el
    * stockTotal del producto en una sola transacción de Firestore.
    *
-   * IMPORTANTE sobre transacciones en Firestore: todas las lecturas (tx.get)
-   * deben ocurrir ANTES que cualquier escritura (tx.set/tx.update). Por eso
-   * aquí se leen variante y producto primero, y recién después se escribe.
+   * El total del producto se recalcula desde sus variantes activas dentro de
+   * la misma transacción. Así también se corrigen inconsistencias antiguas
+   * cuando se registra el siguiente movimiento.
+   *
+   * IMPORTANTE: todas las lecturas (tx.get) deben ocurrir ANTES que cualquier
+   * escritura (tx.set/tx.update).
    */
   async registrarMovimiento({ tipo, varianteId, cantidad, motivo, observacion, usuario }) {
     if (!TIPOS_VALIDOS.includes(tipo)) {
@@ -52,7 +55,10 @@ export const inventarioService = {
         error.status = 404;
         throw error;
       }
-      const producto = productoSnap.data();
+      // Leer todas las variantes del producto en la transacción para no
+      // depender de un stockTotal que pudo haber quedado desactualizado.
+      const variantesQuery = db.collection("variantes").where("productoId", "==", variante.productoId);
+      const variantesSnap = await tx.get(variantesQuery);
 
       // 2) CÁLCULO
       const stockAnterior = variante.stockActual;
@@ -75,7 +81,12 @@ export const inventarioService = {
       }
 
       const estadoStock = calcularEstadoStock(stockResultante, variante.stockMinimo ?? 0);
-      const delta = stockResultante - stockAnterior;
+      const stockTotalCalculado = variantesSnap.docs.reduce((total, doc) => {
+        const datos = doc.data();
+        if (datos.activo !== true) return total;
+        const stock = doc.id === varianteId ? stockResultante : Number(datos.stockActual ?? 0);
+        return total + (Number.isFinite(stock) ? stock : 0);
+      }, 0);
 
       // 3) ESCRITURAS
       tx.update(varianteRef, {
@@ -85,7 +96,7 @@ export const inventarioService = {
       });
 
       tx.update(productoRef, {
-        stockTotal: (producto.stockTotal ?? 0) + delta,
+        stockTotal: stockTotalCalculado,
         fechaActualizacion: new Date(),
       });
 
@@ -126,3 +137,4 @@ export const inventarioService = {
     return movimientoRepository.listar(filtros);
   },
 };
+
