@@ -32,6 +32,17 @@ const MAX_PRODUCTOS_POR_PEDIDO = 30;
 const MAX_CANTIDAD_POR_PRODUCTO = 50;
 const MAX_OBSERVACION = 300;
 
+function generarIdPedido() {
+  const anio = new Date().getFullYear();
+  const caracteres = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+  let codigo = "";
+  for (let i = 0; i < 6; i++) {
+    codigo += caracteres[Math.floor(Math.random() * caracteres.length)];
+  }
+
+  return `ORD-${anio}-${codigo}`;
+}
 /**
  * Valida lo que llega del navegador (que se puede manipular): cantidades enteras
  * y positivas, sin ids raros, y junta las líneas repetidas de una misma variante.
@@ -106,6 +117,7 @@ export const pedidoService = {
     const pagoRestante = total - pagoInicial;
 
     const pedido = {
+      idPedido: generarIdPedido(),
       clienteId,
       clienteNombre: clienteNombre || "",
       clienteEmail: clienteEmail || "",
@@ -230,8 +242,9 @@ export const pedidoService = {
       pedido = await pedidoRepository.emitirComprobanteSiFalta(pedidoId);
     }
 
-    return {
+   return {
       numero: pedido.comprobante.numero,
+      idPedido: pedido.idPedido || pedido.id,
       emitidoEn: pedido.comprobante.emitidoEn,
       pedidoId: pedido.id,
       estadoPedido: pedido.estado,

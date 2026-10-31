@@ -66,7 +66,10 @@ export default function Comprobante() {
             </div>
           )}
           <div>
-            <b>Pedido:</b> {datos.pedidoId}
+          <b>N.º de pedido:</b> {datos.numero}
+           </div>
+              <div>
+           <b>ID de pedido:</b> {datos.idPedido}
           </div>
         </section>
 
