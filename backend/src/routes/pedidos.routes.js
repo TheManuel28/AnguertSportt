@@ -61,6 +61,20 @@ router.post("/:id/reportar-pago-yape", verificarToken, async (req, res, next) =>
     next(error);
   }
 });
+// Comprobante de pedido (no tributario): personal de la tienda o el cliente dueño del pedido
+router.get("/:id/comprobante", verificarToken, async (req, res, next) => {
+  try {
+    const cliente = await clienteService.obtenerPorUid(req.usuario.uid);
+    const comprobante = await pedidoService.obtenerComprobante({
+      pedidoId: req.params.id,
+      usuario: req.usuario,
+      cliente,
+    });
+    res.json(comprobante);
+  } catch (error) {
+    next(error);
+  }
+});
 
 // El administrador/almacenero ve todos los pedidos, con filtro opcional por estado
 router.get("/", verificarToken, permitirRoles("administrador", "almacenero"), async (req, res, next) => {
@@ -71,6 +85,7 @@ router.get("/", verificarToken, permitirRoles("administrador", "almacenero"), as
     next(error);
   }
 });
+
 
 // Solo el administrador confirma el pago inicial y cambia estados
 router.post(

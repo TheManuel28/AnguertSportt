@@ -14,6 +14,7 @@ import Dashboard from "./pages/Dashboard";
 import AdminProductos from "./pages/AdminProductos";
 import AdminInventario from "./pages/AdminInventario";
 import AdminPedidos from "./pages/AdminPedidos";
+import Comprobante from "./pages/Comprobante";
 
 // Cualquier usuario autenticado (cliente, almacenero o administrador)
 function RutaPrivada({ children }) {
@@ -50,7 +51,11 @@ function AppRoutes() {
             </RutaPrivada>
           }
         />
-
+        <Route path="/comprobante/:id" 
+        element={/* mismo envoltorio que /mis-pedidos */ 
+        <Comprobante />
+         } 
+        />
         <Route
           path="/admin"
           element={

@@ -5,6 +5,22 @@ const coleccion = db.collection("pedidos");
 // Como Firestore no permite dos documentos con el mismo ID, es imposible
 // registrar el mismo comprobante en dos pedidos distintos.
 const operaciones = db.collection("operacionesYape");
+// Contador para numerar los comprobantes de pedido de forma correlativa.
+const contadores = db.collection("contadores");
+const ID_CONTADOR_COMPROBANTES = "comprobantes";
+const formatearNumeroComprobante = (n) => `AS-${String(n).padStart(6, "0")}`;
+
+/**
+ * Asigna el siguiente número de comprobante al pedido (si todavía no tiene).
+ * Debe llamarse dentro de una transacción, DESPUÉS de haber leído el pedido y el contador.
+ */
+function numerarComprobante(tx, pedido, contadorRef, contadorSnap) {
+  if (pedido.comprobante) return {};
+  const siguiente = (contadorSnap.exists ? contadorSnap.data().ultimo : 0) + 1;
+  if (contadorSnap.exists) tx.update(contadorRef, { ultimo: siguiente });
+  else tx.set(contadorRef, { ultimo: siguiente });
+  return { comprobante: { numero: formatearNumeroComprobante(siguiente), emitidoEn: new Date() } };
+}
 
 function errorHttp(status, mensaje) {
   const error = new Error(mensaje);
@@ -121,14 +137,53 @@ export const pedidoRepository = {
     });
   },
 
+    /**
+   * Cierra la confirmación: marca el pago como confirmado y EMITE el comprobante
+   * de pedido con su número correlativo, todo en una transacción (el número nunca
+   * se repite ni se salta aunque se confirmen pedidos a la vez).
+   */
   async marcarPagoConfirmado(id, nombreUsuario) {
-    await coleccion.doc(id).update({
-      stockDescontado: true,
-      estadoPago: "PAGO_INICIAL_CONFIRMADO",
-      pagoConfirmadoPor: nombreUsuario,
-      pagoConfirmadoEn: new Date(),
-      pagoRechazo: null,
-      fechaActualizacion: new Date(),
+    return db.runTransaction(async (tx) => {
+      const ref = coleccion.doc(id);
+      const contadorRef = contadores.doc(ID_CONTADOR_COMPROBANTES);
+      const snap = await tx.get(ref);
+      const contadorSnap = await tx.get(contadorRef);
+      if (!snap.exists) throw errorHttp(404, "Pedido no encontrado");
+      const pedido = snap.data();
+
+      const cambios = {
+        stockDescontado: true,
+        estadoPago: "PAGO_INICIAL_CONFIRMADO",
+        pagoConfirmadoPor: nombreUsuario,
+        pagoConfirmadoEn: new Date(),
+        pagoRechazo: null,
+        fechaActualizacion: new Date(),
+        ...numerarComprobante(tx, pedido, contadorRef, contadorSnap),
+      };
+      tx.update(ref, cambios);
+    });
+  },
+
+  /**
+   * Garantiza que un pedido con pago confirmado tenga comprobante. Sirve para los
+   * pedidos confirmados ANTES de existir esta función: se numera la primera vez
+   * que alguien lo pide, una sola vez.
+   */
+  async emitirComprobanteSiFalta(id) {
+    return db.runTransaction(async (tx) => {
+      const ref = coleccion.doc(id);
+      const contadorRef = contadores.doc(ID_CONTADOR_COMPROBANTES);
+      const snap = await tx.get(ref);
+      const contadorSnap = await tx.get(contadorRef);
+      if (!snap.exists) throw errorHttp(404, "Pedido no encontrado");
+      const pedido = snap.data();
+
+      if (pedido.estadoPago !== "PAGO_INICIAL_CONFIRMADO") {
+        throw errorHttp(409, "El comprobante se emite cuando la tienda confirma el pago inicial");
+      }
+      const cambios = numerarComprobante(tx, pedido, contadorRef, contadorSnap);
+      if (cambios.comprobante) tx.update(ref, cambios);
+      return { id, ...pedido, ...cambios };
     });
   },
 

@@ -32,6 +32,7 @@ function normalizar(obj) {
 function errorIA(mensaje) {
   const error = new Error(mensaje);
   error.status = 502;
+  error.expose = true
   return error;
 }
 
@@ -81,6 +82,7 @@ export const iaService = {
     if (!apiKey) {
       const error = new Error("Falta configurar GEMINI_API_KEY en el .env del backend");
       error.status = 500;
+      error.expose = true
       throw error;
     }
 

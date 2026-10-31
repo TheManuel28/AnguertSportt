@@ -27,6 +27,36 @@ function errorHttp(status, mensaje) {
   error.status = status;
   return error;
 }
+const ROLES_PERSONAL = ["administrador", "almacenero"];
+const MAX_PRODUCTOS_POR_PEDIDO = 30;
+const MAX_CANTIDAD_POR_PRODUCTO = 50;
+const MAX_OBSERVACION = 300;
+
+/**
+ * Valida lo que llega del navegador (que se puede manipular): cantidades enteras
+ * y positivas, sin ids raros, y junta las líneas repetidas de una misma variante.
+ */
+function normalizarItems(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw errorHttp(400, "El pedido debe tener al menos un producto");
+  }
+  if (items.length > MAX_PRODUCTOS_POR_PEDIDO) {
+    throw errorHttp(400, `Un pedido no puede tener más de ${MAX_PRODUCTOS_POR_PEDIDO} productos distintos`);
+  }
+  const porVariante = new Map();
+  for (const item of items) {
+    const varianteId = typeof item?.varianteId === "string" ? item.varianteId.trim() : "";
+    if (!varianteId || varianteId.length > 100 || varianteId.includes("/")) {
+      throw errorHttp(400, "Hay un producto inválido en el pedido");
+    }
+    const cantidad = item?.cantidad;
+    if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > MAX_CANTIDAD_POR_PRODUCTO) {
+      throw errorHttp(400, `La cantidad de cada producto debe ser un número entero entre 1 y ${MAX_CANTIDAD_POR_PRODUCTO}`);
+    }
+    porVariante.set(varianteId, (porVariante.get(varianteId) ?? 0) + cantidad);
+  }
+  return [...porVariante].map(([varianteId, cantidad]) => ({ varianteId, cantidad }));
+}
 
 export const pedidoService = {
   /**
@@ -36,14 +66,12 @@ export const pedidoService = {
    * para no reservar existencias de pedidos que nunca llegan a pagarse.
    */
   async crearPedido({ clienteId, clienteNombre, clienteEmail, items, observacion }) {
-    if (!items || items.length === 0) {
-      throw errorHttp(400, "El pedido debe tener al menos un producto");
-    }
+    const itemsValidos = normalizarItems(items);
 
     let total = 0;
     const detalle = [];
 
-    for (const item of items) {
+    for (const item of itemsValidos) {
       const variante = await varianteRepository.obtenerPorId(item.varianteId);
       if (!variante) {
         throw errorHttp(404, `La variante ${item.varianteId} no existe`);
@@ -87,7 +115,7 @@ export const pedidoService = {
       pagoRestante,
       estadoPago: "PENDIENTE_PAGO_INICIAL",
       estado: "PENDIENTE_PAGO_INICIAL",
-      observacion: observacion || "",
+      observacion: typeof observacion === "string" ? observacion.trim().slice(0, MAX_OBSERVACION) : "",
       fechaCreacion: new Date(),
       fechaActualizacion: new Date(),
     };
@@ -140,13 +168,14 @@ export const pedidoService = {
    *  3) se descuenta el stock; si algo falla, el pedido vuelve a su estado anterior.
    */
   async confirmarPagoInicial(pedidoId, usuario) {
+    
     const pedido = await pedidoRepository.obtenerPorId(pedidoId);
     if (!pedido) throw errorHttp(404, "Pedido no encontrado");
 
     if (!ESTADOS_SIN_PAGO.includes(pedido.estado)) {
       throw errorHttp(409, "Este pedido ya fue procesado o no está pendiente de pago");
     }
-
+    
     for (const item of pedido.items) {
       const variante = await varianteRepository.obtenerPorId(item.varianteId);
       if (!variante || variante.stockActual < item.cantidad) {
@@ -156,6 +185,7 @@ export const pedidoService = {
         );
       }
     }
+    
 
     const { estadoAnterior } = await pedidoRepository.reclamarConfirmacion(pedidoId, ESTADOS_SIN_PAGO);
 
@@ -181,7 +211,48 @@ export const pedidoService = {
     );
     return pedidoRepository.obtenerPorId(pedidoId);
   },
+    /**
+   * Comprobante de pedido (documento NO tributario). Lo ve el personal de la tienda
+   * y el cliente dueño del pedido; para cualquier otro usuario el pedido "no existe".
+   */
+  async obtenerComprobante({ pedidoId, usuario, cliente }) {
+    let pedido = await pedidoRepository.obtenerPorId(pedidoId);
+    if (!pedido) throw errorHttp(404, "Pedido no encontrado");
 
+    const esPersonal = ROLES_PERSONAL.includes(usuario?.rol);
+    if (!esPersonal && (!cliente || pedido.clienteId !== cliente.id)) {
+      throw errorHttp(404, "Pedido no encontrado");
+    }
+    if (pedido.estadoPago !== "PAGO_INICIAL_CONFIRMADO") {
+      throw errorHttp(409, "El comprobante se emite cuando la tienda confirma el pago inicial");
+    }
+    if (!pedido.comprobante) {
+      pedido = await pedidoRepository.emitirComprobanteSiFalta(pedidoId);
+    }
+
+    return {
+      numero: pedido.comprobante.numero,
+      emitidoEn: pedido.comprobante.emitidoEn,
+      pedidoId: pedido.id,
+      estadoPedido: pedido.estado,
+      tienda: {
+        nombre: process.env.TIENDA_NOMBRE || "Angher Sport",
+        telefono: process.env.TIENDA_TELEFONO || null,
+        direccion: process.env.TIENDA_DIRECCION || null,
+      },
+      cliente: { nombre: pedido.clienteNombre || "", email: pedido.clienteEmail || "" },
+      items: pedido.items,
+      total: pedido.total,
+      pagoInicial: pedido.pagoInicial,
+      pagoRestante: pedido.pagoRestante,
+      pago: {
+        metodo: pedido.metodoPago === "YAPE_MANUAL" ? "Yape" : "Pago en tienda",
+        numeroOperacion: pedido.pagoYape?.numeroOperacion ?? null,
+        confirmadoEn: pedido.pagoConfirmadoEn ?? null,
+      },
+      leyenda: "Documento no tributario. No es una boleta ni una factura electrónica.",
+    };
+  },
   async cambiarEstado(pedidoId, nuevoEstado) {
     if (!ESTADOS_ASIGNABLES.includes(nuevoEstado)) {
       throw errorHttp(400, "Estado de pedido inválido");

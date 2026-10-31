@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 import PagoYape from "../components/PagoYape";
-
+import { Link } from "react-router-dom"
 function formatearFecha(fecha) {
   if (!fecha) return "-";
   const ms = fecha._seconds ? fecha._seconds * 1000 : Date.parse(fecha);
@@ -84,6 +84,17 @@ export default function MisPedidos() {
             </div>
 
             <PagoYape pedido={p} onActualizado={reemplazarPedido} />
+            {p.estadoPago === "PAGO_INICIAL_CONFIRMADO" && (
+  <div className="acciones-comprobante">
+    <Link to={`/comprobante/${p.id}`} className="boton-comprobante">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6M8 13h8M8 17h5" />
+      </svg>
+      Ver comprobante
+    </Link>
+  </div>
+)}
           </div>
         ))}
       </div>
